@@ -1,0 +1,324 @@
+﻿using System;
+using Microsoft.Win32;
+
+namespace VT_Editor {
+    class Program {
+        private const string enterToCont = "Press Enter to continue...";
+
+        static void Main () {
+            Menu ();
+        }
+
+        static void Menu () {
+            Console.Clear ();
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            //Console.WriteLine (CenterText("Advantage Virtual Terminal Registry Editor/Removal tool"));
+            Console.ResetColor ();
+            GetRegistryInfo ();
+
+            try {
+                Console.WriteLine ("");
+                Console.WriteLine ("1: Delete the VT Registry Keys (Removes the 'HighJump Software' key and all of it's Subkeys)");
+                Console.WriteLine ("2: Edit the default VT");
+                Console.WriteLine ("3: Turn VT menu options ON or OFF");
+                Console.WriteLine ("4: Remove unused VTs");
+                Console.WriteLine ("5: Exit the program");
+
+                string userInput = Console.ReadLine ();
+
+                switch (userInput) {
+
+                    case "1":
+                        DeleteAllVTs ();
+                        break;
+
+                    case "2":
+                        EditVT ();
+                        break;
+
+                    case "3":
+                        MenuOps ();
+                        break;
+
+                    case "4":
+                        RemoveVT ();
+                        break;
+
+                    case "5":
+                        Environment.Exit (0);
+                        break;
+
+                    default:
+                        Console.WriteLine ("Out of range");
+                        ErrorHandler (1, "VT", "IP", "Port");
+                        GetRegistryInfo ();
+                        Menu ();
+                        break;
+                }
+            } catch (FormatException) {
+                Console.WriteLine ("Format Error");
+                ErrorHandler (1, "VT", "IP", "Port");
+                GetRegistryInfo ();
+                Menu ();
+            }
+        }
+
+        static void GetRegistryInfo()
+        {
+            RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\HighJump Software\Advantage Virtual Terminal");
+
+            if (key != null)
+            {
+                Console.Write("The default Virtual Terminal is: ");
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine(key.GetValue("Default Device Name"));
+                Console.ResetColor();
+                Console.WriteLine("\nOther installed VTs: ");
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                foreach (var v in key.GetSubKeyNames())
+                {
+                    if (v != Convert.ToString(key.GetValue("Default Device Name")))
+                    {
+                        Console.WriteLine(v);
+                    }
+                }
+                key.Close();
+                Console.ResetColor();
+                return;
+            }
+            else
+            {
+                Console.WriteLine("There doesn't seem to be a Virtual Terminal installed on this computer.");
+                Console.WriteLine("Press Enter to exit the program");
+                Console.ReadLine();
+                Environment.Exit(0);
+            }
+        }
+
+        static void DeleteAllVTs () {
+            Console.WriteLine ("\nYou are about to remove all Advantage Virtual Terminal Registry Keys!");
+            Console.Write ("Are you sure? (Y/N)");
+            string chooseYesNo = Console.ReadLine ().ToUpper ();
+            string keyIsThere = Convert.ToString (Registry.CurrentUser.OpenSubKey (@"SOFTWARE\HighJump Software"));
+
+            if (chooseYesNo == "Y" && keyIsThere != null) {
+                RegistryKey key = Registry.CurrentUser.OpenSubKey (@"SOFTWARE", true);
+                key.DeleteSubKeyTree ("HighJump Software");
+                Console.WriteLine ("\nThe Advantage Virtual Terminal keys were successfully removed from the Registry");
+                Console.WriteLine (enterToCont);
+                Console.ReadLine ();
+            } else if (chooseYesNo == "N") {
+                Console.WriteLine ("\nThe Advantage Virtual Terminal keys were not deleted");
+                Console.WriteLine (enterToCont);
+                Console.ReadLine ();
+                Console.Clear ();
+                GetRegistryInfo ();
+                Menu ();
+            } else {
+                ErrorHandler (1, "VT", "IP", "Port");
+                DeleteAllVTs ();
+            }
+            Main ();
+        }
+
+        static void EditVT () 
+        {
+            Console.Write ("\nEnter the new VT number: VT_");
+            string newVT = Console.ReadLine ();
+            Console.Write ("Enter IP address (Enter to leave as default 10.92.237.27):");
+            string vtIP = Console.ReadLine ();
+            if (vtIP == "") {
+                vtIP = "10.92.237.27";
+            }
+            Console.Write ("Enter port number (Enter to leave as default 4500):");
+            string vtPort = Console.ReadLine ();
+            if (vtPort == "") {
+                vtPort = "4500";
+            }
+
+            try
+            {
+
+                if (Convert.ToInt32(newVT) <= 0)
+                {
+                    ErrorHandler(2, newVT, vtIP, vtPort);
+                    EditVT();
+                }
+                string commitChange = Summerize(newVT, vtIP, vtPort);
+                Console.WriteLine(commitChange);
+
+                if (commitChange == "Y")
+                {
+                    RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\HighJump Software\Advantage Virtual Terminal", true);
+                    key.SetValue("Default Device Name", "VT_" + newVT);
+                    RegistryKey key0 = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\HighJump Software\Advantage Virtual Terminal\VT_" + newVT, true);
+                        if (key0 == null) {
+                            key.CreateSubKey("VT_" + newVT);
+                        }
+
+                    RegistryKey key1 = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\HighJump Software\Advantage Virtual Terminal\VT_" + newVT, true);
+                        if (key1 != null)
+                        {
+                            key1.SetValue("IP Address", vtIP);
+                        }
+                        else
+                        {
+                            key1.CreateSubKey("IP Address");
+                            key1.SetValue("IP Address", vtIP);
+                        }
+
+                    RegistryKey key2 = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\HighJump Software\Advantage Virtual Terminal\VT_" + newVT, true);
+                        if (key2 != null)
+                        {
+                            key2.SetValue("Port", vtPort);
+                        }
+                        else
+                        {
+                            key2.CreateSubKey("Port");
+                            key2.SetValue("Port", vtPort);
+                        }
+
+                    key.Close();
+                    key1.Close();
+                    key2.Close();
+                    Console.Write("VT changed to ");
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("VT_" + newVT + "\n");
+                    Console.ResetColor();
+                    Console.Write("Press Enter to continue . . . ");
+                    Console.ReadLine();
+                    Menu();
+                }
+                else if (commitChange == "N")
+                {
+                    Console.Clear();
+                    Menu();
+                }
+                else
+                {
+                    ErrorHandler(1, newVT, "IP", "Port");
+                    Menu();
+                }
+
+            }
+            catch (FormatException)
+            {
+            ErrorHandler(2, newVT, vtIP, vtPort);
+            EditVT();
+            }
+        }
+
+        static void MenuOps()
+        {
+            RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\HighJump Software\Advantage Virtual Terminal", true);
+            string checkMenuOptions = Convert.ToString(key.GetValue("DisplayMenuOptions"));
+            if (checkMenuOptions == "1")
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                key.SetValue("DisplayMenuOptions", "0");
+                Console.WriteLine("Menu Options Disabled");
+                Console.ResetColor();
+                Console.WriteLine("Press Enter to continue . . .");
+                Console.ReadLine();
+                Menu();
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                key.SetValue("DisplayMenuOptions", "1");
+                Console.WriteLine("Menu Options Enabled");
+                Console.ResetColor();
+                Console.WriteLine("Press Enter to continue . . .");
+                Console.ReadLine();
+                Menu();
+            }
+        }
+
+        static void RemoveVT()
+        {
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\HighJump Software\Advantage Virtual Terminal", true))
+            {
+                Console.Write("\nEnter the VT number to be deleted: VT_");
+                string vtToDelete = "VT_" + Console.ReadLine();
+                Console.Write("Are you sure? (Y/N)");
+                string chooseYesNo = Console.ReadLine().ToUpper();
+                string keyIsThere = Convert.ToString(Registry.CurrentUser.OpenSubKey(@"SOFTWARE\HighJump Software\" + vtToDelete));
+                try
+                {
+                    if (chooseYesNo == "Y" && keyIsThere != null)
+                    {
+                        key.DeleteSubKeyTree(vtToDelete);
+                        Console.WriteLine("\nThe VT deleted successfully ");
+                        Console.WriteLine(enterToCont);
+                        Console.ReadLine();
+                    }
+                    else if (chooseYesNo == "N")
+                    {
+                        Console.WriteLine("\nThe VT was not deleted ");
+                        Console.WriteLine(enterToCont);
+                        Console.ReadLine();
+                        Console.Clear();
+                        GetRegistryInfo();
+                        Menu();
+                    }
+                    else
+                    {
+                        ErrorHandler(1, "VT", "IP", "Port");
+                        RemoveVT();
+                    }
+                }
+                catch (System.ArgumentException)
+                {
+                    ErrorHandler(3, "VT", "IP", "Port");
+                    RemoveVT();
+                }
+                Main();
+            }
+        }
+        
+        static void ErrorHandler (int errorCode, string newVT, string vtIP, string vtPort) {
+            Console.ForegroundColor = ConsoleColor.Red;
+            if (errorCode == 1) {
+                Console.WriteLine ("Please choose a valid menu option");
+                Console.ResetColor ();
+                Console.Write ("Press Enter to continue . . .");
+                Console.ReadLine ();
+            } else if (errorCode == 2) //Format exception occurs if user tries to name a VT something non-numerical
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Clear ();
+                Console.WriteLine ("Are you sure you want to name this VT VT_" + newVT + " ? (Y/N)");
+                Console.ResetColor ();
+                string yesOrNo = Console.ReadLine ();
+                if (yesOrNo.ToUpper() == "Y")
+                {
+                    Summerize(newVT, vtIP, vtPort);
+                }
+                Console.Clear ();
+            } else if (errorCode == 3) {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine ("That VT does not exist on this system.");
+                Console.ResetColor ();
+            } else {
+                Console.WriteLine ("Undefined error");
+            }
+        }
+
+        static void CenterText (string text) {
+            int center = Console.WindowWidth / 2 + text.Length / 2;
+            Console.WriteLine ("{0," + center + "}", text);
+        }
+
+        static string Summerize(string newVT, string vtIP, string vtPort)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("VT number: VT_" + newVT);
+            Console.WriteLine("IP Address: " + vtIP);
+            Console.WriteLine("Port: " + vtPort);
+            Console.ResetColor();
+            Console.Write("Commit changes? (Y/N)");
+            string commitChange = Console.ReadLine().ToUpper();
+            return commitChange;
+        }
+    }
+}
